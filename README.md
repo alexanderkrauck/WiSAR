@@ -4,4 +4,4 @@ This is our project solution to a computer vision task using unsupervised machin
 
 Project is in Progress.
 
-# read project architecture to see what to work on!!!!
+# read project_architecture.ipynb to see what to work on!!!!
