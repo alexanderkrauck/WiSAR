@@ -52,6 +52,7 @@ class MultiViewTemporalSample:
         self.photos = []
         self.homographies = []
         self.mask = mask
+        self.mode = mode
         for timestep in range(0, 7):
             timestep_photos = []
             timestep_homographies = []
@@ -91,7 +92,14 @@ class MultiViewTemporalSample:
         plt.subplots_adjust(wspace=0, hspace=0)
         plt.show()
 
-    def integrate(self, timestep=0):
+    def integrate(self, timestep: int = 0) -> np.ndarray:
+        """Integrate the Images of this sample for a given timestep
+        
+        Parameters
+        ----------
+        timestep: int
+            The timestep (starting at 0) where the pictures should be integrated over.
+        """
 
         ov_mask = ~self.mask.copy()
 
@@ -111,7 +119,22 @@ class MultiViewTemporalSample:
 
         return np.uint8(integrated_image)
 
-    def draw_labels(self, labels: Optional[np.ndarray] = None, on_integrated: bool = False):
+    def draw_labels(
+        self, labels: Optional[np.ndarray] = None, on_integrated: bool = False
+    ):
+        """Draws images with bounding boxes for predictions
+        
+        Parameters
+        ----------
+        labels: Optional[np.ndarray]
+            If not None, then those are the bounding boxes in an numpy array.
+            The first dimension corresponds to the number of labels and in the second dimension should, as provided, be
+            margin x, margin y, size x, size y.
+            If None, then the bounding boxes of the validation data are used.
+        on_integrated: bool
+            If True, then the bounding boxes are drawn on the integrated images of timestep 3 (the center timestep).
+            If False, then the bounding boxes are drawn on the center camera and center timestep (3_B01).
+        """
 
         if on_integrated:
             image = self.integrate(timestep=3)
@@ -119,6 +142,7 @@ class MultiViewTemporalSample:
             image = self.photos[3, 4]  # the center image = 3_B01
 
         if labels is None:
+            assert self.mode == "validation"
             labels = self.labels
 
         for label in labels:
@@ -180,13 +204,22 @@ class MultiViewTemporalDataset(Dataset):
     def __getitem__(self, index: int):
         return self.samples[index]
 
+
 class GridCutoutDataset(MultiViewTemporalDataset):
     """Dataset for training autoencoders on single subimages of custom size
     
         
     """
-    def __init__(self, cutout_shape: int = 64, randomize:bool=False, data_path: str = "data", mode: str = "train", apply_mask: bool = True):
-        #TODO think about removing primarely black images!
+
+    def __init__(
+        self,
+        cutout_shape: int = 64,
+        randomize: bool = False,
+        data_path: str = "data",
+        mode: str = "train",
+        apply_mask: bool = True,
+    ):
+        # TODO think about removing primarely black images!
         """
 
         Parameters
@@ -216,8 +249,8 @@ class GridCutoutDataset(MultiViewTemporalDataset):
         self.randomize = randomize
 
         self.cutout_shape = cutout_shape
-        self.n_row_subindices = (1024 // cutout_shape)
-        self.n_total_subindices = self.n_row_subindices**2
+        self.n_row_subindices = 1024 // cutout_shape
+        self.n_total_subindices = self.n_row_subindices ** 2
 
     def __len__(self):
         return len(self.samples) * self.n_total_subindices
@@ -225,12 +258,15 @@ class GridCutoutDataset(MultiViewTemporalDataset):
     def __getitem__(self, index: int):
         subindex = index % self.n_total_subindices
         hard_index = index // self.n_total_subindices
-        
+
         sample = self.samples[hard_index]
         col = subindex % self.n_row_subindices
         row = subindex // self.n_row_subindices
 
-        #TODO: add randomization somehow
-        cut_sample = sample[row*self.cutout_shape:(row + 1) * self.cutout_shape, col * self.cutout_shape:(col+1) * self.cutout_shape]
+        # TODO: add optional randomization somehow
+        cut_sample = sample[
+            row * self.cutout_shape : (row + 1) * self.cutout_shape,
+            col * self.cutout_shape : (col + 1) * self.cutout_shape,
+        ]
         return cut_sample
 
