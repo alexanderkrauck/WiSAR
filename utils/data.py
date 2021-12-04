@@ -131,7 +131,7 @@ class MultiViewTemporalSample:
         plt.show()
 
 
-class ImageDataset(Dataset):
+class MultiViewTemporalDataset(Dataset):
     """Dataset class that should be used for loading the provided data.
     
     The ImageDataset loads all samples into the memory and stores each sample in a MutliViewTemporalSample instance.
@@ -177,7 +177,8 @@ class ImageDataset(Dataset):
         return self.samples[index]
 
 
-# class Pytorch_Dataloader(DataLoader):
+class Pytorch_Dataloader(DataLoader):
+
 # TODO: Code was useless because the DataLoader should get a Dataset instance and only load the samples there, i.e. minibatch them etc...
 # We might need a custom 'collate_fn' depending on the architecture we choose.
 
