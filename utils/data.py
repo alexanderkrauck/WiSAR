@@ -17,16 +17,8 @@ import json
 import cv2
 
 
-_photo_order = ["B05",
-                "B04",
-                "B03",
-                "B02",
-                "B01",
-                "G01",
-                "G02",
-                "G03",
-                "G04",
-                "G05"]
+_photo_order = ["B05", "B04", "B03", "B02", "B01", "G01", "G02", "G03", "G04", "G05"]
+
 
 class MultiViewTemporalSample:
     """The Data Structure to be used for representing single samples of the WISAR challenge.
@@ -37,7 +29,9 @@ class MultiViewTemporalSample:
     If mode is validation, also labels will be loaded into the array 'labels'.
     """
 
-    def __init__(self, sample_path: str, mode:str, mask: Optional[np.ndarray] = None) -> None:
+    def __init__(
+        self, sample_path: str, mode: str, mask: Optional[np.ndarray] = None
+    ) -> None:
         """
         
         Parameters
@@ -61,7 +55,7 @@ class MultiViewTemporalSample:
             timestep_photos = []
             timestep_homographies = []
             for perspective in _photo_order:
-                name = str(timestep) + "-" + perspective 
+                name = str(timestep) + "-" + perspective
                 photo = np.asarray(Image.open(os.path.join(sample_path, name + ".png")))
                 homography = homography_dict[name]
 
@@ -76,12 +70,11 @@ class MultiViewTemporalSample:
             self.homographies.append(timestep_homographies)
         self.photos = np.array(self.photos)
         self.homographies = np.array(self.homographies)
-        
 
         if mode == "validation":
-            self.labels = np.array(json.load(
-                open(os.path.join(sample_path, "labels.json"))
-            ))
+            self.labels = np.array(
+                json.load(open(os.path.join(sample_path, "labels.json")))
+            )
 
     def show_photo_grid(self):
         """Show a photo grid of all photos in the sample"""
@@ -97,38 +90,45 @@ class MultiViewTemporalSample:
         plt.subplots_adjust(wspace=0, hspace=0)
         plt.show()
 
-    def integrate(self, timestep = 0):
+    def integrate(self, timestep=0):
 
         ov_mask = ~self.mask.copy()
 
-        integrated_image = np.zeros((1024,1024,3))
+        integrated_image = np.zeros((1024, 1024, 3))
 
-        for photo, homography in zip(self.photos[timestep], self.homographies[timestep]):
+        for photo, homography in zip(
+            self.photos[timestep], self.homographies[timestep]
+        ):
 
-            warped_image = cv2.warpPerspective(photo,homography,photo.shape[:2])
+            warped_image = cv2.warpPerspective(photo, homography, photo.shape[:2])
 
             ov_mask = np.where(np.sum(warped_image, axis=-1) > 0, ov_mask, False)
             integrated_image += warped_image
 
-        integrated_image[~ov_mask] = 0 
+        integrated_image[~ov_mask] = 0
         integrated_image /= 10
 
         return np.uint8(integrated_image)
 
     def draw_labels(self, labels: np.ndarray, on_integrated: bool = False):
-        
+
         if on_integrated:
             image = self.integrate(timestep=3)
         else:
-            image = self.photos[3,4]#the center image = 3_B01
+            image = self.photos[3, 4]  # the center image = 3_B01
 
         for label in labels:
-            image = cv2.rectangle(image, (label[0], label[1]),(label[0]+label[2], label[1]+label[3]),(0,0,255),5)
-        
-        plt.figure(figsize=(10,10))
+            image = cv2.rectangle(
+                image,
+                (label[0], label[1]),
+                (label[0] + label[2], label[1] + label[3]),
+                (0, 0, 255),
+                5,
+            )
+
+        plt.figure(figsize=(10, 10))
         plt.imshow(image)
         plt.show()
-
 
 
 class ImageDataset(Dataset):
@@ -137,7 +137,9 @@ class ImageDataset(Dataset):
     The ImageDataset loads all samples into the memory and stores each sample in a MutliViewTemporalSample instance.
     """
 
-    def __init__(self, data_path: str = "data", mode: str = "train", apply_mask: bool = True):
+    def __init__(
+        self, data_path: str = "data", mode: str = "train", apply_mask: bool = True
+    ):
         """
 
         Parameters
@@ -157,12 +159,12 @@ class ImageDataset(Dataset):
         self.path = os.path.join(data_path, mode)
 
         if apply_mask:
-            mask = ~np.asarray(Image.open(os.path.join("data","mask.png")), dtype=bool)
+            mask = ~np.asarray(Image.open(os.path.join("data", "mask.png")), dtype=bool)
         else:
             mask = None
 
         self.samples = [
-            MultiViewTemporalSample(os.path.join(self.path, s), mode, mask = mask)
+            MultiViewTemporalSample(os.path.join(self.path, s), mode, mask=mask)
             for s in os.listdir(self.path)
             if os.path.isdir(os.path.join(self.path, s))
         ]
@@ -171,11 +173,11 @@ class ImageDataset(Dataset):
     def __len__(self):
         return len(self.samples)
 
-    def __getitem__(self, index:int):
+    def __getitem__(self, index: int):
         return self.samples[index]
 
 
-#class Pytorch_Dataloader(DataLoader):
-    #TODO: Code was useless because the DataLoader should get a Dataset instance and only load the samples there, i.e. minibatch them etc...
-    #We might need a custom 'collate_fn' depending on the architecture we choose.
+# class Pytorch_Dataloader(DataLoader):
+# TODO: Code was useless because the DataLoader should get a Dataset instance and only load the samples there, i.e. minibatch them etc...
+# We might need a custom 'collate_fn' depending on the architecture we choose.
 
