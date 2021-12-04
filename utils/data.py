@@ -6,9 +6,10 @@ __author__ = "Alexander Krauck"
 __email__ = "alexander.krauck@gmail.com"
 __date__ = "04-12-2021"
 
-from typing import Optional
+from typing import List, Optional
 import numpy as np
 from PIL import Image
+from torch.utils import data
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from matplotlib import pyplot as plt
@@ -110,12 +111,15 @@ class MultiViewTemporalSample:
 
         return np.uint8(integrated_image)
 
-    def draw_labels(self, labels: np.ndarray, on_integrated: bool = False):
+    def draw_labels(self, labels: Optional[np.ndarray] = None, on_integrated: bool = False):
 
         if on_integrated:
             image = self.integrate(timestep=3)
         else:
             image = self.photos[3, 4]  # the center image = 3_B01
+
+        if labels is None:
+            labels = self.labels
 
         for label in labels:
             image = cv2.rectangle(
@@ -176,9 +180,57 @@ class MultiViewTemporalDataset(Dataset):
     def __getitem__(self, index: int):
         return self.samples[index]
 
+class GridCutoutDataset(MultiViewTemporalDataset):
+    """Dataset for training autoencoders on single subimages of custom size
+    
+        
+    """
+    def __init__(self, cutout_shape: int = 64, randomize:bool=False, data_path: str = "data", mode: str = "train", apply_mask: bool = True):
+        #TODO think about removing primarely black images!
+        """
 
-class Pytorch_Dataloader(DataLoader):
+        Parameters
+        ----------
+        cutout_shape: int
+            Each image returned will have a shape of [cutout_shape, cutout_shape, 3]
+        randomize: bool TODO
+            If there is freedom w.r.t. to the cutout_shape (i.e. if cutout_shape is not a divisor of 1024)
+            then the remaining pixels are randomly chosen such that everything is used.
+        data_path: str
+            The path where all data is included. This means the folder should contain train, test and validation folders and the mask.
+        mode: str
+            Either 'train', 'validation' or 'test'. Only for 'validation' targets will be available.
+        apply_mask: bool
+            If True, then the supplied mask will be applied on all pictures.
+        """
 
-# TODO: Code was useless because the DataLoader should get a Dataset instance and only load the samples there, i.e. minibatch them etc...
-# We might need a custom 'collate_fn' depending on the architecture we choose.
+        super().__init__(data_path=data_path, mode=mode, apply_mask=apply_mask)
+
+        samples = []
+        for sample in self.samples:
+            sample = sample.photos
+            sample = sample.reshape(-1, *sample.shape[-3:])
+            samples.append(sample)
+
+        self.samples = np.concatenate(samples)
+        self.randomize = randomize
+
+        self.cutout_shape = cutout_shape
+        self.n_row_subindices = (1024 // cutout_shape)
+        self.n_total_subindices = self.n_row_subindices**2
+
+    def __len__(self):
+        return len(self.samples) * self.n_total_subindices
+
+    def __getitem__(self, index: int):
+        subindex = index % self.n_total_subindices
+        hard_index = index // self.n_total_subindices
+        
+        sample = self.samples[hard_index]
+        col = subindex % self.n_row_subindices
+        row = subindex // self.n_row_subindices
+
+        #TODO: add randomization somehow
+        cut_sample = sample[row*self.cutout_shape:(row + 1) * self.cutout_shape, col * self.cutout_shape:(col+1) * self.cutout_shape]
+        return cut_sample
 
