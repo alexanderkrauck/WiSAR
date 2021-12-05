@@ -13,13 +13,12 @@ import os
 from pathlib import Path
 from datetime import datetime
 
-#Convention Imports
+# Convention Imports
 from abc import ABC, abstractmethod
 from typing import Union, List, Tuple, Callable, Dict, Iterable, Optional
 
 
 class AbstractTorchArchitecture(ABC):
-
     @abstractmethod
     def save(self, path: str, filename: str):
         """This Function should save the parameters of the model.
@@ -32,7 +31,7 @@ class AbstractTorchArchitecture(ABC):
             The filename of the parameter file.
         """
         raise NotImplementedError("This is abstract!")
-        
+
 
 class ConvolutionalAutoencoderV1(nn.Module, AbstractTorchArchitecture):
     """A Convolutional Autoencoder that expects 64x64 inputs"""
@@ -64,8 +63,7 @@ class ConvolutionalAutoencoderV1(nn.Module, AbstractTorchArchitecture):
         self.dec_pool3 = nn.MaxUnpool2d((2, 2))
         self.dec_conv3 = nn.ConvTranspose2d(16, 3, 3)
 
-        self.dropout = nn.Dropout2d(p = p_dropout)
-
+        self.dropout = nn.Dropout2d(p=p_dropout)
 
     def forward(self, x):
         x, indices1 = self.enc_pool1(self.enc_conv1(x))
@@ -98,15 +96,14 @@ class ConvolutionalAutoencoderV1(nn.Module, AbstractTorchArchitecture):
         """
 
         if path is None:
-            path = os.path.join("saved_models","ConvolutionalAutoencoderV1")
-        
+            path = os.path.join("saved_models", "ConvolutionalAutoencoderV1")
+        Path(path).mkdir(parents=True, exist_ok=True)
+
         if filename is None:
             filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S.pt")
 
         save_name = os.path.join(path, filename)
-        Path(save_name).mkdir(parents=True, exist_ok=True)
         torch.save(self.state_dict(), save_name)
 
         print(f"Paramters saved to file '{save_name}'.")
-
 

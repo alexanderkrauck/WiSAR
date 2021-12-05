@@ -268,7 +268,8 @@ class GridCutoutDataset(MultiViewTemporalDataset):
             row * self.cutout_shape : (row + 1) * self.cutout_shape,
             col * self.cutout_shape : (col + 1) * self.cutout_shape,
         ]
-        #reshape image so it can be seen as 3 channel image by Convolution!
-        cut_sample=np.array([cut_sample[:,:,0],cut_sample[:,:,1],cut_sample[:,:,2]])
-        return cut_sample.astype(np.float32)/255
+
+        cut_sample = np.transpose(cut_sample, (2, 0, 1)).astype(np.float32) / 255
+
+        return cut_sample
 

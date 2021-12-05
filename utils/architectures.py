@@ -10,19 +10,19 @@ from typing import List
 import torch
 from .data import MultiViewTemporalSample
 
-class BasicConvolutionalAnomalyDetection:
 
+class BasicConvolutionalAnomalyDetection:
     def __init__(self, pretrained_convolutional_network):
-        
+
         self.pretrained_convolutional_network = pretrained_convolutional_network
-        
+
         pass
 
     def infer(self, samples: List[MultiViewTemporalSample]):
 
         for sample in samples:
-            
+
             photos = sample.photos
 
-            pass #TODO: DO EVERYTHING!
-    
+            pass  # TODO: DO EVERYTHING!
+
