@@ -6,7 +6,7 @@ __author__ = "Alexander Krauck"
 __email__ = "alexander.krauck@gmail.com"
 __date__ = "04-12-2021"
 
-from .basic_function import integrate_images
+from .basic_function import integrate_images, draw_labels
 
 from typing import List, Optional
 import numpy as np
@@ -137,18 +137,30 @@ class MultiViewTemporalSample:
             assert self.mode == "validation"
             labels = self.labels
 
-        for label in labels:
-            image = cv2.rectangle(
-                image,
-                (label[0], label[1]),
-                (label[0] + label[2], label[1] + label[3]),
-                (0, 0, 255),
-                5,
-            )
+        draw_labels(image, labels)
 
-        plt.figure(figsize=(10, 10))
-        plt.imshow(image)
-        plt.show()
+    def get_warped_photo(self, timestep: int, perspective: int) -> np.ndarray:
+        """Get a specific warped photo from this sample.
+
+        Parameters
+        ----------
+        timestep: int
+            The timestep of the wanted image (from 0 to 6)
+        perspective: int
+            The perspective of the wanted image (from 0 to 9)
+
+        Returns
+        -------
+        warped_photo: np.ndarray
+            The wanted photo warped using the homographies of this sample.
+        """
+
+        photo = self.photos[timestep, perspective]
+        homography = self.homographies[timestep, perspective]
+
+        warped_photo = cv2.warpPerspective(photo, homography, photo.shape[:2])
+
+        return warped_photo
 
 
 class MultiViewTemporalDataset(Dataset):
