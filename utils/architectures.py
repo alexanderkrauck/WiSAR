@@ -12,7 +12,6 @@ from .data import MultiViewTemporalSample
 from .sub_architectures import ConvolutionalAutoencoderV1
 
 from typing import List
-from matplotlib.pyplot import grid
 import torch
 import numpy as np
 
@@ -131,11 +130,9 @@ class BasicTimestepAnomalyDetection:
 
         pass
 
-    def infer(self, samples: List[MultiViewTemporalSample]):
+    def infer(self, sample: MultiViewTemporalSample):
 
-        for sample in samples:
+        photos = sample.photos
 
-            photos = sample.photos
-
-            pass
+        pass
 
