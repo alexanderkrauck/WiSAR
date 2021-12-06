@@ -6,6 +6,8 @@ __author__ = "Alexander Krauck"
 __email__ = "alexander.krauck@gmail.com"
 __date__ = "04-12-2021"
 
+from .basic_function import integrate_images
+
 from typing import List, Optional
 import numpy as np
 from PIL import Image
@@ -101,23 +103,13 @@ class MultiViewTemporalSample:
             The timestep (starting at 0) where the pictures should be integrated over.
         """
 
-        ov_mask = ~self.mask.copy()
+        integrated_image = integrate_images(
+            images=self.photos[timestep],
+            homographies=self.homographies[timestep],
+            mask=self.mask,
+        )
 
-        integrated_image = np.zeros((1024, 1024, 3))
-
-        for photo, homography in zip(
-            self.photos[timestep], self.homographies[timestep]
-        ):
-
-            warped_image = cv2.warpPerspective(photo, homography, photo.shape[:2])
-
-            ov_mask = np.where(np.sum(warped_image, axis=-1) > 0, ov_mask, False)
-            integrated_image += warped_image
-
-        integrated_image[~ov_mask] = 0
-        integrated_image /= 10
-
-        return np.uint8(integrated_image)
+        return integrated_image
 
     def draw_labels(
         self, labels: Optional[np.ndarray] = None, on_integrated: bool = False
@@ -139,7 +131,7 @@ class MultiViewTemporalSample:
         if on_integrated:
             image = self.integrate(timestep=3)
         else:
-            image = self.photos[3, 4]  # the center image = 3_B01
+            image = self.photos[3, 4].copy()  # the center image = 3_B01
 
         if labels is None:
             assert self.mode == "validation"
