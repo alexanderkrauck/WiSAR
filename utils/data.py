@@ -55,6 +55,8 @@ class MultiViewTemporalSample:
         self.homographies = []
         self.mask = mask
         self.mode = mode
+        self.sample_path = sample_path
+        
         for timestep in range(0, 7):
             timestep_photos = []
             timestep_homographies = []
