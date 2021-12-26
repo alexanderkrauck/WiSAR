@@ -83,3 +83,57 @@ def draw_labels(image: np.ndarray, labels: Union[np.ndarray, List[np.ndarray]], 
         plt.show()
 
     return image
+
+
+def reshape_split(array: np.ndarray, box_size: np.ndarray):
+    """Returns a 'boxed' version of the input.
+    
+    Usually an image as input is expected (a numpy array of shape heigth x width x channels).
+
+    Parameters
+    ----------
+    array: np.ndarray
+        The input to be 'boxed'.
+    box_size: np.ndarray
+        The size of the boxes to be made with (heigth, width).
+
+    Returns
+    -------
+    A flattened (along the grid dimensions) array of shape (n, box_size[0], box_size[1], channels).
+    n is the number of extracted boxes.
+    """
+
+    assert array.shape[0] % box_size[0] == 0
+    assert array.shape[1] % box_size[1] == 0
+    
+    arr = array.reshape(array.shape[0]//box_size[0], box_size[0], array.shape[1]//box_size[1], box_size[1], array.shape[-1])
+    arr = arr.swapaxes(1,2)
+
+    arr = arr.reshape(-1, *box_size, array.shape[-1])
+
+    return arr
+
+def reshape_merge(array: np.ndarray, box_size, original_shape = np.array([1024,1024,3])):
+    """The inverse function of reshape_split
+    
+    Takes a (flat) grid of images and puts it back to the original image
+
+    Parameters
+    ----------
+    array: np.ndarray
+        The boxes to be merged of shape (n, box_size[0], box_size[1], channels).
+    box_size: np.ndarray
+        The size of the boxes to be assumed (heigth, width).
+    original_shape: np.ndarray
+        The original shape of the image that was inputted in reshape_split.
+
+    Returns
+    -------
+    The merged image.
+    """
+
+    arr = array.reshape(original_shape[0]//box_size[0], original_shape[1]//box_size[1], *array.shape[1:])
+    arr = arr.swapaxes(1,2)
+    arr = arr.reshape(original_shape)
+
+    return arr
