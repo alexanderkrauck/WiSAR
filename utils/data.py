@@ -33,7 +33,11 @@ class MultiViewTemporalSample:
     """
 
     def __init__(
-        self, sample_path: str, mode: str, mask: Optional[np.ndarray] = None
+        self,
+        sample_path: str,
+        mode: str,
+        mask: Optional[np.ndarray] = None,
+        equalize_hist: bool = False,
     ) -> None:
         """
         
@@ -45,6 +49,8 @@ class MultiViewTemporalSample:
             Either 'train', 'validation' or 'test'. Only for 'validation' targets will be available.
         mask: Optional[np.ndarray] 
             If not None, this mask is applied.
+        equalize_hist: bool
+            If True, then the equalize_hist function from cv2 is applied channel-wise for each image.
         """
 
         homography_dict = json.load(
@@ -56,13 +62,17 @@ class MultiViewTemporalSample:
         self.mask = mask
         self.mode = mode
         self.sample_path = sample_path
-        
         for timestep in range(0, 7):
             timestep_photos = []
             timestep_homographies = []
             for perspective in _photo_order:
                 name = str(timestep) + "-" + perspective
                 photo = np.array(Image.open(os.path.join(sample_path, name + ".png")))
+
+                if equalize_hist:
+                    for channel in range(3):
+                        photo[..., channel] = cv2.equalizeHist(photo[..., channel])
+
                 homography = homography_dict[name]
 
                 if self.mask is not None:
@@ -175,7 +185,11 @@ class MultiViewTemporalDataset(Dataset):
     """
 
     def __init__(
-        self, data_path: str = "data", mode: str = "train", apply_mask: bool = True
+        self,
+        data_path: str = "data",
+        mode: str = "train",
+        apply_mask: bool = True,
+        equalize_hist: bool = False,
     ):
         """
 
@@ -187,6 +201,8 @@ class MultiViewTemporalDataset(Dataset):
             Either 'train', 'validation' or 'test'. Only for 'validation' targets will be available.
         apply_mask: bool
             If True, then the supplied mask will be applied on all pictures.
+        equalize_hist: bool
+            If True, then the equalize-hist function from cv2 will be applied channel-wise for each sample.
         #TODO: Lazy loading might be necessary as the data is rather large!
         """
 
@@ -201,7 +217,9 @@ class MultiViewTemporalDataset(Dataset):
             mask = None
 
         self.samples = [
-            MultiViewTemporalSample(os.path.join(self.path, s), mode, mask=mask)
+            MultiViewTemporalSample(
+                os.path.join(self.path, s), mode, mask=mask, equalize_hist=equalize_hist
+            )
             for s in os.listdir(self.path)
             if os.path.isdir(os.path.join(self.path, s))
         ]
