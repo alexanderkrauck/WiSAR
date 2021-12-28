@@ -164,6 +164,9 @@ class MultiViewTemporalSample:
 
         return warped_photo
 
+    def __getitem__(self, arg):
+        return self.photos[arg]
+
 
 class MultiViewTemporalDataset(Dataset):
     """Dataset class that should be used for loading the provided data.
