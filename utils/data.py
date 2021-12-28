@@ -62,7 +62,7 @@ class MultiViewTemporalSample:
             timestep_homographies = []
             for perspective in _photo_order:
                 name = str(timestep) + "-" + perspective
-                photo = np.asarray(Image.open(os.path.join(sample_path, name + ".png")))
+                photo = np.array(Image.open(os.path.join(sample_path, name + ".png")))
                 homography = homography_dict[name]
 
                 if self.mask is not None:
