@@ -51,10 +51,8 @@ class MultiViewTemporalSample:
             The path of the sample to be loaded into this MutliViewTemporalSample instance.
         mode: str
             Either 'train', 'validation' or 'test'. Only for 'validation' targets will be available.
-        mask: Optional[np.ndarray] 
-            If not None, this mask is applied.
-        equalize_hist: bool
-            If True, then the equalize_hist function from cv2 is applied channel-wise for each image.
+        preprocess_image_options: Dict
+            The options for the preprocess_image function
         """
 
         homography_dict = json.load(
@@ -200,10 +198,8 @@ class MultiViewTemporalDataset(Dataset):
             The path where all data is included. This means the folder should contain train, test and validation folders and the mask.
         mode: str
             Either 'train', 'validation' or 'test'. Only for 'validation' targets will be available.
-        apply_mask: bool
-            If True, then the supplied mask will be applied on all pictures.
-        equalize_hist: bool
-            If True, then the equalize-hist function from cv2 will be applied channel-wise for each sample.
+        preprocess_image_options: Dict
+            The options for the preprocess_image function
         #TODO: Lazy loading might be necessary as the data is rather large!
         """
 
@@ -262,8 +258,8 @@ class GridCutoutDataset(MultiViewTemporalDataset):
             The path where all data is included. This means the folder should contain train, test and validation folders and the mask.
         mode: str
             Either 'train', 'validation' or 'test'. Only for 'validation' targets will be available.
-        apply_mask: bool
-            If True, then the supplied mask will be applied on all pictures.
+        preprocess_image_options: Dict
+            The options for the preprocess_image function
         """
 
         super().__init__(

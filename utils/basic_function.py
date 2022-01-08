@@ -168,6 +168,20 @@ def preprocess_image(
     equalize_hist: bool = False,
     crop_black: bool = False,
 ) -> np.ndarray:
+    """This function can preprocess images appropriatly
+    
+    Parameters
+    ----------
+    image:Union[np.ndarray, str]
+        If np.ndarray, then this is the image to be preprocessed. 
+        If str, then it is assumed that this is the image path and it will be loaded and thereafter be preprocess.
+    use_mask: bool
+        If true, the provided mask will be applied on the image
+    equalize_hist: bool
+        If true, then the color distribution of each image will be corrected
+    crop_blac: bool
+        If true, then the black bars will be removed from the image, then the image will have the shape 592x1024, otherwise 1024x1024.
+    """
 
     if isinstance(image, str):
         image = np.array(Image.open(image))
@@ -181,8 +195,6 @@ def preprocess_image(
     if equalize_hist:
         for channel in range(3):
             image[..., channel] = cv2.equalizeHist(image[..., channel])
-
-    
 
     return image
 
