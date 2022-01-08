@@ -350,12 +350,7 @@ class RandomSamplingGridCutoutDataset(Dataset):
         self.n_epoch_samples = n_epoch_samples
         self.n_images_in_ram = n_images_in_ram
         self.resample_image_every_n_draws = resample_image_every_n_draws
-        if crop_shape is None:
-            self.do_crop = False
-        else:
-            self.do_crop = True
-            self.cut_shape = np.array(crop_shape)
-            self.rand_crop_range = np.array([592, 1024]) - np.array(crop_shape)
+
 
         self.image_paths = []
         for dir in os.listdir(path):
@@ -374,8 +369,16 @@ class RandomSamplingGridCutoutDataset(Dataset):
             self.ram_images.append(image)
 
         self.ram_images = np.array(self.ram_images)
-        print(self.ram_images.shape)
         self.count_before_resample = 0
+
+        if crop_shape is None:
+            self.do_crop = False
+        else:
+            self.do_crop = True
+            self.cut_shape = np.array(crop_shape)
+            img_height = self.ram_images.shape[1]
+            self.rand_crop_range = np.array([img_height, 1024]) - np.array(crop_shape)
+
 
     def sample_image(self):
         image_path = random.sample(self.image_paths, 1)[0]
