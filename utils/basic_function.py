@@ -10,7 +10,7 @@ mask__ = ~np.asarray(Image.open(os.path.join("data", "mask.png")), dtype=bool)
 
 
 def integrate_images(
-    images: np.ndarray, homographies: np.ndarray, mask: np.ndarray
+    images: np.ndarray, homographies: np.ndarray
 ) -> np.ndarray:
     """Integrate time given images using the given homographies and the mask.
     
@@ -20,8 +20,6 @@ def integrate_images(
         The images to integrate. The array should have shape [m,n,n,3], where n is the size of the image and m is the number of images.
     homographies: np.ndarray
         The homographies for the images. The array should be of shape [m, 3, 3].
-    mask: np.ndarray
-        The mask for the images with shape [n,n], where 1s are for the spots that should be removed.
 
     Returns
     -------
@@ -29,7 +27,7 @@ def integrate_images(
         The integrated image of shape [n,n,3]
     """
 
-    ov_mask = ~mask
+    ov_mask = ~mask__
 
     integrated_image = np.zeros((1024, 1024, 3))
 

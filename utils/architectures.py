@@ -132,7 +132,7 @@ class BasicAutoencoderAnomalyDetectionV1(ScoreAnomalyDetection):
             differences, sample.homographies
         ):
             integrated.append(
-                integrate_images(timestep_differences, homographie, sample.mask)
+                integrate_images(timestep_differences, homographie)
             )
 
         integrated = np.array(integrated).astype(np.float32) / 255

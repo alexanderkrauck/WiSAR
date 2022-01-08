@@ -113,8 +113,7 @@ class MultiViewTemporalSample:
 
         integrated_image = integrate_images(
             images=self.photos[timestep],
-            homographies=self.homographies[timestep],
-            mask=self.mask,
+            homographies=self.homographies[timestep]
         )
 
         return integrated_image
