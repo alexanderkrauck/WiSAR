@@ -41,7 +41,7 @@ class MultiViewTemporalSample:
             "use_mask": True,
             "equalize_hist": True,
             "crop_black": True,
-        }
+        },
     ) -> None:
         """
         
@@ -72,9 +72,7 @@ class MultiViewTemporalSample:
                 name = str(timestep) + "-" + perspective
                 photo_path = os.path.join(sample_path, name + ".png")
 
-                photo = preprocess_image(
-                    photo_path, **preprocess_image_options
-                )
+                photo = preprocess_image(photo_path, **preprocess_image_options)
 
                 homography = homography_dict[name]
 
@@ -192,7 +190,7 @@ class MultiViewTemporalDataset(Dataset):
             "use_mask": True,
             "equalize_hist": True,
             "crop_black": True,
-        }
+        },
     ):
         """
 
@@ -214,10 +212,11 @@ class MultiViewTemporalDataset(Dataset):
 
         self.path = os.path.join(data_path, mode)
 
-
         self.samples = [
             MultiViewTemporalSample(
-                os.path.join(self.path, s), mode, preprocess_image_options = preprocess_image_options
+                os.path.join(self.path, s),
+                mode,
+                preprocess_image_options=preprocess_image_options,
             )
             for s in os.listdir(self.path)
             if os.path.isdir(os.path.join(self.path, s))
@@ -247,7 +246,7 @@ class GridCutoutDataset(MultiViewTemporalDataset):
             "use_mask": True,
             "equalize_hist": True,
             "crop_black": True,
-        }
+        },
     ):
         # TODO think about removing primarely black images!
         """
@@ -267,7 +266,11 @@ class GridCutoutDataset(MultiViewTemporalDataset):
             If True, then the supplied mask will be applied on all pictures.
         """
 
-        super().__init__(data_path=data_path, mode=mode,preprocess_image_options = preprocess_image_options)
+        super().__init__(
+            data_path=data_path,
+            mode=mode,
+            preprocess_image_options=preprocess_image_options,
+        )
 
         samples = []
         for sample in self.samples:
@@ -305,10 +308,13 @@ class GridCutoutDataset(MultiViewTemporalDataset):
 
 
 class RandomSamplingGridCutoutDataset(Dataset):
+    """Lazy Loading Dataset Class that should be used for training the Autoencoder(-like) part"""
+
+
     def __init__(
         self,
-        mode: str = "train",
         path: str = "data",
+        mode: str = "train",
         n_images_in_ram: int = 100,
         n_epoch_samples: int = 10000,
         resample_image_every_n_draws: int = 100,
@@ -319,6 +325,26 @@ class RandomSamplingGridCutoutDataset(Dataset):
             "crop_black": True,
         },
     ):
+        """
+        
+        Parameters
+        ----------
+        path: str
+            Path to the data-directory, where the provided data was extracted to. There should be train, validation and test set and also the mask.
+        mode: str
+            One of train, test or validation
+        n_images_in_ram: int
+            This parameter decides how many images will be kept in the RAM simultaniously
+        n_epoch_samples: int
+            This parameter decides how many samples will be used per epoch.
+        resample_image_every_n_draws: int
+            This parameter decides after how many draws one image from the RAM should be replaced by a new image from the disk.
+        crop_shape: Optional[Tuple]
+            This parameter, when not None, decides how large the sampled images are cropped. E.g. 64x64.
+            If None then the images will have the shape 592 x 1024 or 1024x1024 with removing the black bars and without respectively
+        preprocess_image_options: Dict
+            The options for the preprocess_image function.
+        """
         assert mode in ["train", "test", "validation"]
 
         self.preprocess_image_options = preprocess_image_options
