@@ -6,9 +6,9 @@ __author__ = "Alexander Krauck"
 __email__ = "alexander.krauck@gmail.com"
 __date__ = "04-12-2021"
 
-from .basic_function import integrate_images, draw_labels
+from .basic_function import integrate_images, draw_labels, preprocess_image
 
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 import numpy as np
 from PIL import Image
 from torch.utils import data
@@ -18,6 +18,7 @@ from matplotlib import pyplot as plt
 import os
 import json
 import cv2
+import random
 
 
 _photo_order = ["B05", "B04", "B03", "B02", "B01", "G01", "G02", "G03", "G04", "G05"]
@@ -36,8 +37,11 @@ class MultiViewTemporalSample:
         self,
         sample_path: str,
         mode: str,
-        mask: Optional[np.ndarray] = None,
-        equalize_hist: bool = False,
+        preprocess_image_options: Dict = {
+            "use_mask": True,
+            "equalize_hist": True,
+            "crop_black": True,
+        }
     ) -> None:
         """
         
@@ -59,7 +63,6 @@ class MultiViewTemporalSample:
 
         self.photos = []
         self.homographies = []
-        self.mask = mask
         self.mode = mode
         self.sample_path = sample_path
         for timestep in range(0, 7):
@@ -67,16 +70,13 @@ class MultiViewTemporalSample:
             timestep_homographies = []
             for perspective in _photo_order:
                 name = str(timestep) + "-" + perspective
-                photo = np.array(Image.open(os.path.join(sample_path, name + ".png")))
+                photo_path = os.path.join(sample_path, name + ".png")
 
-                if equalize_hist:
-                    for channel in range(3):
-                        photo[..., channel] = cv2.equalizeHist(photo[..., channel])
+                photo = preprocess_image(
+                    photo_path, **preprocess_image_options
+                )
 
                 homography = homography_dict[name]
-
-                if self.mask is not None:
-                    photo[mask] = 0
 
                 timestep_homographies.append(homography)
                 timestep_photos.append(photo)
@@ -188,8 +188,11 @@ class MultiViewTemporalDataset(Dataset):
         self,
         data_path: str = "data",
         mode: str = "train",
-        apply_mask: bool = True,
-        equalize_hist: bool = False,
+        preprocess_image_options: Dict = {
+            "use_mask": True,
+            "equalize_hist": True,
+            "crop_black": True,
+        }
     ):
         """
 
@@ -211,14 +214,10 @@ class MultiViewTemporalDataset(Dataset):
 
         self.path = os.path.join(data_path, mode)
 
-        if apply_mask:
-            mask = ~np.asarray(Image.open(os.path.join("data", "mask.png")), dtype=bool)
-        else:
-            mask = None
 
         self.samples = [
             MultiViewTemporalSample(
-                os.path.join(self.path, s), mode, mask=mask, equalize_hist=equalize_hist
+                os.path.join(self.path, s), mode, preprocess_image_options = preprocess_image_options
             )
             for s in os.listdir(self.path)
             if os.path.isdir(os.path.join(self.path, s))
@@ -244,7 +243,11 @@ class GridCutoutDataset(MultiViewTemporalDataset):
         randomize: bool = False,
         data_path: str = "data",
         mode: str = "train",
-        apply_mask: bool = True,
+        preprocess_image_options: Dict = {
+            "use_mask": True,
+            "equalize_hist": True,
+            "crop_black": True,
+        }
     ):
         # TODO think about removing primarely black images!
         """
@@ -264,7 +267,7 @@ class GridCutoutDataset(MultiViewTemporalDataset):
             If True, then the supplied mask will be applied on all pictures.
         """
 
-        super().__init__(data_path=data_path, mode=mode, apply_mask=apply_mask)
+        super().__init__(data_path=data_path, mode=mode,preprocess_image_options = preprocess_image_options)
 
         samples = []
         for sample in self.samples:
@@ -299,4 +302,98 @@ class GridCutoutDataset(MultiViewTemporalDataset):
         cut_sample = np.transpose(cut_sample, (2, 0, 1)).astype(np.float32) / 255
 
         return cut_sample
+
+
+class RandomSamplingGridCutoutDataset(Dataset):
+    def __init__(
+        self,
+        mode: str = "train",
+        path: str = "data",
+        n_images_in_ram: int = 100,
+        n_epoch_samples: int = 10000,
+        resample_image_every_n_draws: int = 100,
+        crop_shape: Optional[Tuple] = (64, 64),
+        preprocess_image_options: Dict = {
+            "use_mask": True,
+            "equalize_hist": True,
+            "crop_black": True,
+        },
+    ):
+        assert mode in ["train", "test", "validation"]
+
+        self.preprocess_image_options = preprocess_image_options
+
+        path = os.path.join(path, mode)
+
+        self.n_epoch_samples = n_epoch_samples
+        self.n_images_in_ram = n_images_in_ram
+        self.resample_image_every_n_draws = resample_image_every_n_draws
+        if crop_shape is None:
+            self.do_crop = False
+        else:
+            self.do_crop = True
+            self.cut_shape = np.array(crop_shape)
+            self.rand_crop_range = np.array([592, 1024]) - np.array(crop_shape)
+
+        self.image_paths = []
+        for dir in os.listdir(path):
+            sub_path = os.path.join(path, dir)
+            for photo_name in os.listdir(sub_path):
+                if os.path.splitext(photo_name)[1] != ".png":
+                    continue
+
+                image_path = os.path.join(sub_path, photo_name)
+                self.image_paths.append(image_path)
+
+        self.ram_images = []
+        for n in range(n_images_in_ram):
+
+            image = self.sample_image()
+            self.ram_images.append(image)
+
+        self.ram_images = np.array(self.ram_images)
+        print(self.ram_images.shape)
+        self.count_before_resample = 0
+
+    def sample_image(self):
+        image_path = random.sample(self.image_paths, 1)[0]
+        image = preprocess_image(image_path, **self.preprocess_image_options)
+
+        return image
+
+    def resample_image(self):
+
+        new_image = self.sample_image()
+        replace_idx = random.randint(0, self.n_images_in_ram - 1)
+
+        self.ram_images[replace_idx] = new_image
+
+    def __len__(self):
+        return self.n_epoch_samples
+
+    def __getitem__(self, index):
+
+        image_index = index % self.resample_image_every_n_draws  # maybe change?
+
+        if self.do_crop:
+            vertical_margin = random.randint(0, self.rand_crop_range[0] - 1)
+            horizontal_margin = random.randint(0, self.rand_crop_range[1] - 1)
+
+            image = self.ram_images[
+                image_index,
+                vertical_margin : vertical_margin + self.cut_shape[0],
+                horizontal_margin : horizontal_margin + self.cut_shape[1],
+            ]
+        else:
+            image = self.ram_images[image_index]
+
+        float_image = np.transpose(image, (2, 0, 1)).astype(np.float32) / 255
+
+        self.count_before_resample = (
+            self.count_before_resample + 1
+        ) % self.resample_image_every_n_draws
+        if self.count_before_resample == 0:
+            self.resample_image()
+
+        return float_image
 

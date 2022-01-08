@@ -2,6 +2,11 @@ from typing import List, Optional, Union
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+from PIL import Image
+import os
+
+
+mask__ = ~np.asarray(Image.open(os.path.join("data", "mask.png")), dtype=bool)
 
 
 def integrate_images(
@@ -40,7 +45,12 @@ def integrate_images(
 
     return np.uint8(integrated_image)
 
-def draw_labels(image: np.ndarray, labels: Union[np.ndarray, List[np.ndarray]], plot_result: bool = True):
+
+def draw_labels(
+    image: np.ndarray,
+    labels: Union[np.ndarray, List[np.ndarray]],
+    plot_result: bool = True,
+):
     """Given an image, draw the labels on top of the image and alternatively show the result.
     
     Parameters
@@ -64,8 +74,8 @@ def draw_labels(image: np.ndarray, labels: Union[np.ndarray, List[np.ndarray]], 
         labels = [labels]
 
     for idx, labels_type in enumerate(labels):
-        color = [0,0,0]
-        if idx<3:
+        color = [0, 0, 0]
+        if idx < 3:
             color[idx] = 255
         color = tuple(color)
         for label in labels_type:
@@ -74,10 +84,10 @@ def draw_labels(image: np.ndarray, labels: Union[np.ndarray, List[np.ndarray]], 
                 (label[0], label[1]),
                 (label[0] + label[2], label[1] + label[3]),
                 color,
-                5
+                5,
             )
 
-    if(plot_result):
+    if plot_result:
         plt.figure(figsize=(10, 10))
         plt.imshow(image)
         plt.show()
@@ -105,15 +115,24 @@ def reshape_split(array: np.ndarray, box_size: np.ndarray):
 
     assert array.shape[0] % box_size[0] == 0
     assert array.shape[1] % box_size[1] == 0
-    
-    arr = array.reshape(array.shape[0]//box_size[0], box_size[0], array.shape[1]//box_size[1], box_size[1], array.shape[-1])
-    arr = arr.swapaxes(1,2)
+
+    arr = array.reshape(
+        array.shape[0] // box_size[0],
+        box_size[0],
+        array.shape[1] // box_size[1],
+        box_size[1],
+        array.shape[-1],
+    )
+    arr = arr.swapaxes(1, 2)
 
     arr = arr.reshape(-1, *box_size, array.shape[-1])
 
     return arr
 
-def reshape_merge(array: np.ndarray, box_size, original_shape = np.array([1024,1024,3])):
+
+def reshape_merge(
+    array: np.ndarray, box_size, original_shape=np.array([1024, 1024, 3])
+):
     """The inverse function of reshape_split
     
     Takes a (flat) grid of images and puts it back to the original image
@@ -132,8 +151,38 @@ def reshape_merge(array: np.ndarray, box_size, original_shape = np.array([1024,1
     The merged image.
     """
 
-    arr = array.reshape(original_shape[0]//box_size[0], original_shape[1]//box_size[1], *array.shape[1:])
-    arr = arr.swapaxes(1,2)
+    arr = array.reshape(
+        original_shape[0] // box_size[0],
+        original_shape[1] // box_size[1],
+        *array.shape[1:]
+    )
+    arr = arr.swapaxes(1, 2)
     arr = arr.reshape(original_shape)
 
     return arr
+
+
+def preprocess_image(
+    image: Union[np.ndarray, str],
+    use_mask: bool = False,
+    equalize_hist: bool = False,
+    crop_black: bool = False,
+) -> np.ndarray:
+
+    if isinstance(image, str):
+        image = np.array(Image.open(image))
+
+    if use_mask:
+        image[mask__] = 0
+
+    if crop_black:
+        image = image[216:-216]
+
+    if equalize_hist:
+        for channel in range(3):
+            image[..., channel] = cv2.equalizeHist(image[..., channel])
+
+    
+
+    return image
+
