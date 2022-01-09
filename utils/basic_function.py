@@ -217,3 +217,19 @@ def show_photo_grid(photo_grid: np.ndarray):
 
     plt.subplots_adjust(wspace=0, hspace=0)
     plt.show()
+
+def warp_image(image: np.ndarray, homography: np.ndarray):
+
+    warped_photo = cv2.warpPerspective(image, homography, image.shape[:2])
+
+    return warped_photo
+
+def warp_image_grid(image_grid: np.ndarray, homographies: np.ndarray):
+    
+    warped_image_grid = np.empty_like(image_grid) 
+
+    for timestep in range(image_grid.shape[0]):
+        for perspective in range(image_grid.shape[1]):
+            warped_image_grid[timestep, perspective] = warp_image(image_grid[timestep, perspective], homographies[timestep, perspective])
+
+    return warped_image_grid

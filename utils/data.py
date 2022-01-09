@@ -6,7 +6,7 @@ __author__ = "Alexander Krauck"
 __email__ = "alexander.krauck@gmail.com"
 __date__ = "04-12-2021"
 
-from .basic_function import integrate_images, draw_labels, preprocess_image, show_photo_grid, mask__
+from .basic_function import *
 
 from typing import Dict, List, Optional, Tuple
 import numpy as np
@@ -109,6 +109,12 @@ class MultiViewTemporalSample:
 
         return integrated_image
 
+    def get_warped_grid(self):
+
+        warped_grid = warp_image_grid(self.photos, self.homographies)
+        
+        return warped_grid
+
     def draw_labels(
         self, labels: Optional[np.ndarray] = None, on_integrated: bool = False
     ):
@@ -156,7 +162,7 @@ class MultiViewTemporalSample:
         photo = self.photos[timestep, perspective]
         homography = self.homographies[timestep, perspective]
 
-        warped_photo = cv2.warpPerspective(photo, homography, photo.shape[:2])
+        warped_photo = warp_image(photo, homography)
 
         return warped_photo
 
