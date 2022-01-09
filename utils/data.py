@@ -6,7 +6,7 @@ __author__ = "Alexander Krauck"
 __email__ = "alexander.krauck@gmail.com"
 __date__ = "04-12-2021"
 
-from .basic_function import integrate_images, draw_labels, preprocess_image
+from .basic_function import integrate_images, draw_labels, preprocess_image, show_photo_grid, mask__
 
 from typing import Dict, List, Optional, Tuple
 import numpy as np
@@ -91,16 +91,7 @@ class MultiViewTemporalSample:
     def show_photo_grid(self):
         """Show a photo grid of all photos in the sample"""
 
-        fig, ax = plt.subplots(7, 10, figsize=(15, 10))
-        for row, timeframe in enumerate(self.photos):
-            for col, perspective in enumerate(timeframe):
-                ax[row, col].imshow(perspective)
-                ax[row, col].axis("off")
-                ax[row, col].set_xticklabels([])
-                ax[row, col].set_yticklabels([])
-
-        plt.subplots_adjust(wspace=0, hspace=0)
-        plt.show()
+        show_photo_grid(self.photos)
 
     def integrate(self, timestep: int = 0) -> np.ndarray:
         """Integrate the Images of this sample for a given timestep
@@ -421,3 +412,33 @@ class RandomSamplingGridCutoutDataset(Dataset):
 
         return float_image
 
+def make_impossible_mask(sample: MultiViewTemporalSample) -> np.ndarray:
+    """Creates the mask for a MultiViewTemporalSample, where there can not be any boxes.
+
+    Parameters
+    ----------
+    sample: MultiViewTemporalSample
+        the sample to do this for.
+    
+    Returns
+    -------
+    impossible_mask: np.ndarray
+        Boolean numpy array of the same shape as each of the photos in the sample.
+        It is true where there can not be any bounding box.
+    """
+
+    bnw = []
+    for timestep_homography in sample.homographies:
+        perspectives = []
+        for homography in timestep_homography:
+            photo = (~mask__).astype(np.uint8)*255
+
+            warped_photo = cv2.warpPerspective(photo, homography, photo.shape[:2])
+
+            perspectives.append(warped_photo)
+        bnw.append(np.array(perspectives))
+    bnw = np.array(bnw)
+
+    impossible_mask = ~ np.amin(bnw, axis=(0,1)).astype(bool)
+
+    return impossible_mask

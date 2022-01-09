@@ -8,8 +8,8 @@ __date__ = "04-13-2021"
 
 from numpy.core.fromnumeric import argmax
 from numpy.core.shape_base import block
-from .basic_function import integrate_images, reshape_split, reshape_merge
-from .data import MultiViewTemporalSample
+from .basic_function import integrate_images, reshape_split, reshape_merge, show_photo_grid
+from .data import MultiViewTemporalSample, make_impossible_mask
 from .sub_architectures import ConvolutionalAutoencoderV1
 
 from typing import List
@@ -123,21 +123,24 @@ class BasicAutoencoderAnomalyDetectionV1(ScoreAnomalyDetection):
         # Step d: Combine Timesteps
         differences = abs(photos - reconstructed_photos)
 
+        if verbose >= 5:
+            show_photo_grid(differences)
+
+
         integrated = []
 
         if verbose >= 3:
             print(f"Warping...")
         homographies_start_time = ti()
-        for timestep_differences, homographie in zip(  # Could also warp all 70 pics!
-            differences, sample.homographies
-        ):
-            integrated.append(
-                integrate_images(timestep_differences, homographie)
-            )
+        
+        flat_differences = np.reshape(differences, (-1, *differences.shape[2:]))**2
+        flat_homographies = np.reshape(sample.homographies, (-1, *sample.homographies.shape[2:]))
+        
+        resulting_integrated = integrate_images(flat_differences, flat_homographies)
 
-        integrated = np.array(integrated).astype(np.float32) / 255
 
-        resulting_integrated = np.mean(integrated, axis=0)
+
+
         if verbose >= 3:
             print(f"Warping finished. Took {ti() - homographies_start_time:.2f}s.")
 
@@ -260,6 +263,10 @@ class ScoreEnsembleAnomalyDetection:
             score = np.sum(scores, axis=0) / np.sum(self.weights) #maybe use some nonlinear thing. like maximum or softmax-ish.
 
             score = (score * 255).astype(np.uint8)
+
+            impossible_mask = make_impossible_mask(sample)
+            score[impossible_mask] = 0
+
             if verbose >= 5:
                 plt.imshow(score, cmap='gray')
                 plt.title("The combined scores")
@@ -283,6 +290,9 @@ class ScoreEnsembleAnomalyDetection:
                 box = np.array(cv2.boundingRect(cntr))
                 boxes.append(box)
             res_boxes.append(np.array(boxes))
+
+
+
 
         return res_boxes
 

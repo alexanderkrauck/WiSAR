@@ -28,18 +28,23 @@ def integrate_images(
     """
 
     ov_mask = ~mask__
+    ov_mask = ov_mask.astype(np.uint8)
 
-    integrated_image = np.zeros((1024, 1024, 3))
+
+    integrated_image = np.zeros(images.shape[1:], dtype=np.int16)
+    integrated_masks = np.zeros_like(ov_mask) #TODO if images are not 1024x1024 then this is a problem here
 
     for photo, homography in zip(images, homographies):
 
         warped_image = cv2.warpPerspective(photo, homography, photo.shape[:2])
+        warped_mask = cv2.warpPerspective(ov_mask, homography, ov_mask.shape[:2])
 
-        ov_mask = np.where(np.sum(warped_image, axis=-1) > 0, ov_mask, False)
         integrated_image += warped_image
+        integrated_masks += warped_mask > 0
 
-    integrated_image[~ov_mask] = 0
-    integrated_image /= 10
+
+    integrated_masks = np.where(integrated_masks == 0, 1, integrated_masks)
+    integrated_image = integrated_image / np.expand_dims(integrated_masks, -1)
 
     return np.uint8(integrated_image)
 
@@ -196,3 +201,19 @@ def preprocess_image(
 
     return image
 
+def show_photo_grid(photo_grid: np.ndarray):
+    """Show a photo grid of time and perspective dimensions"""
+
+    n_timesteps = photo_grid.shape[0]
+    n_perspectives = photo_grid.shape[1]
+
+    _, ax = plt.subplots(n_timesteps, n_perspectives, figsize=(15, 10))
+    for row, timeframe in enumerate(photo_grid):
+        for col, perspective in enumerate(timeframe):
+            ax[row, col].imshow(perspective)
+            ax[row, col].axis("off")
+            ax[row, col].set_xticklabels([])
+            ax[row, col].set_yticklabels([])
+
+    plt.subplots_adjust(wspace=0, hspace=0)
+    plt.show()
