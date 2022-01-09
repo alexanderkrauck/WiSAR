@@ -9,7 +9,7 @@ __date__ = "04-13-2021"
 from numpy.core.fromnumeric import argmax
 from numpy.core.shape_base import block
 from .basic_function import *
-from .data import MultiViewTemporalSample, make_impossible_mask
+from .data import MultiViewTemporalSample, make_impossible_mask, MultiViewTemporalDataset
 from .sub_architectures import ConvolutionalAutoencoderV1
 
 from typing import List
@@ -59,7 +59,7 @@ class BasicAutoencoderAnomalyDetectionV1(ScoreAnomalyDetection):
 
         self.pretrained_convolutional_network = pretrained_convolutional_network.to(
             device
-        )
+        ).eval()
         self.device = device
         self.cutoff_value = cutoff_value
         self.image_sizes = np.array(image_sizes)
@@ -107,7 +107,7 @@ class BasicAutoencoderAnomalyDetectionV1(ScoreAnomalyDetection):
                     reconstructed_grid_images, self.image_sizes
                 )
 
-                if verbose >= 5 and view_idx == 0 and timestep_idx == 0:
+                if verbose >= 3 and view_idx == 0 and timestep_idx == 0:
                     plt.imshow(view)
                     plt.title("The true first view")
                     plt.show()
@@ -127,7 +127,7 @@ class BasicAutoencoderAnomalyDetectionV1(ScoreAnomalyDetection):
         photos = photos.astype(np.float32)/255
         differences = abs(photos - reconstructed_photos)
         #differences[np.amax(differences, -1) < 0.8] = 0
-        if verbose >=5:
+        if verbose >=3:
             show_photo_grid(warp_image_grid(reconstructed_photos, sample.homographies))
             plt.imshow(reconstructed_photos[3,9])
             plt.show()
@@ -248,7 +248,7 @@ class BasicTimestepAnomalyDetection(ScoreAnomalyDetection):
 
 class ScoreEnsembleAnomalyDetection:
     def __init__(
-        self, score_architectures: List[ScoreAnomalyDetection], weights: List[float]
+        self, score_architectures: List[ScoreAnomalyDetection], weights: List[float], min_box_size: int = 27, min_contour_area: int = 15
     ):
         """
         
@@ -262,15 +262,20 @@ class ScoreEnsembleAnomalyDetection:
 
         self.score_architectures = score_architectures
         self.weights = np.array(weights).reshape(-1, 1, 1)
+        self.min_box_size = min_box_size
+        self.min_contour_area = min_contour_area
 
-    def infer(self, samples, threshold = 0.5, verbose = 0):
+    def infer(self, samples: Union[List[MultiViewTemporalSample], MultiViewTemporalDataset], threshold = 0.5, verbose = 0):
+
+        if isinstance(samples, MultiViewTemporalDataset):
+            samples = [samples[idx] for idx in range(len(samples))] 
 
         res_boxes = []
         for sample in samples:
             scores = []
             for architecture in self.score_architectures:
                 score = architecture.score(sample, verbose = verbose)
-                if verbose >= 5:
+                if verbose >= 3:
                     plt.imshow(score, cmap='gray')
                     plt.title(f"Scores of {architecture}")
                     plt.show()
@@ -288,12 +293,12 @@ class ScoreEnsembleAnomalyDetection:
             impossible_mask = make_impossible_mask(sample)
             score[impossible_mask] = 0
 
-            if verbose >= 5:
+            if verbose >= 3:
                 plt.imshow(score, cmap='gray')
                 plt.title("The combined scores")
                 plt.show()
             score = cv2.GaussianBlur(score, (7, 7), 5)
-            if verbose >= 5:
+            if verbose >= 3:
                 plt.imshow(score, cmap='gray')
                 plt.title("The combined scores blurred")
                 plt.show()
@@ -307,12 +312,30 @@ class ScoreEnsembleAnomalyDetection:
 
             boxes = []
             for cntr in contours:
-                box = np.array(cv2.boundingRect(cntr))
-                boxes.append(box)
+                area = cv2.contourArea(cntr)
+                if area < self.min_contour_area:
+                    continue
+
+                (vertical_margin, horizonal_margin, vertical_padding, horizonal_padding) = cv2.boundingRect(cntr)
+
+                if vertical_padding < self.min_box_size:
+                    delta = self.min_box_size - vertical_padding
+                    side_delta = delta // 2
+                    vertical_margin = vertical_margin - side_delta
+                    vertical_padding = vertical_padding + delta
+
+                if horizonal_padding < self.min_box_size:
+                    delta = self.min_box_size - horizonal_padding
+                    side_delta = delta // 2
+                    horizonal_margin = horizonal_margin - side_delta
+                    horizonal_padding = horizonal_padding + delta
+
+                boxes.append(np.array([vertical_margin, horizonal_margin, vertical_padding, horizonal_padding]))
             res_boxes.append(np.array(boxes))
 
 
 
+        
 
         return res_boxes
 
