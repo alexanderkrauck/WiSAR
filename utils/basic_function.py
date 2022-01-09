@@ -4,9 +4,11 @@ import cv2
 import matplotlib.pyplot as plt
 from PIL import Image
 import os
-
+from skimage import exposure
 
 mask__ = ~np.asarray(Image.open(os.path.join("data", "mask.png")), dtype=bool)
+
+histogram_reference_image__ = np.asarray(Image.open("histogram_reference_image.png"))
 
 
 def integrate_images(
@@ -170,6 +172,7 @@ def preprocess_image(
     use_mask: bool = False,
     equalize_hist: bool = False,
     crop_black: bool = False,
+    match_histogram: bool = False,
 ) -> np.ndarray:
     """This function can preprocess images appropriatly
     
@@ -182,12 +185,17 @@ def preprocess_image(
         If true, the provided mask will be applied on the image
     equalize_hist: bool
         If true, then the color distribution of each image will be corrected
-    crop_blac: bool
+    crop_black: bool
         If true, then the black bars will be removed from the image, then the image will have the shape 592x1024, otherwise 1024x1024.
+    match_histogram: bool
+        If true, then the histogram of the image will be matched to one preselected reference image 'histogram_reference_image.png'.
     """
 
     if isinstance(image, str):
         image = np.array(Image.open(image))
+
+    if match_histogram:
+        image = exposure.match_histograms(image, histogram_reference_image__, multichannel=True)
 
     if use_mask:
         image[mask__] = 0
@@ -198,6 +206,8 @@ def preprocess_image(
     if equalize_hist:
         for channel in range(3):
             image[..., channel] = cv2.equalizeHist(image[..., channel])
+
+
 
     return image
 
@@ -210,6 +220,7 @@ def show_photo_grid(photo_grid: np.ndarray):
     _, ax = plt.subplots(n_timesteps, n_perspectives, figsize=(15, 10))
     for row, timeframe in enumerate(photo_grid):
         for col, perspective in enumerate(timeframe):
+            
             ax[row, col].imshow(perspective)
             ax[row, col].axis("off")
             ax[row, col].set_xticklabels([])

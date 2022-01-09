@@ -8,7 +8,7 @@ __date__ = "04-13-2021"
 
 from numpy.core.fromnumeric import argmax
 from numpy.core.shape_base import block
-from .basic_function import integrate_images, reshape_split, reshape_merge, show_photo_grid
+from .basic_function import *
 from .data import MultiViewTemporalSample, make_impossible_mask
 from .sub_architectures import ConvolutionalAutoencoderV1
 
@@ -47,13 +47,14 @@ class ScoreAnomalyDetection(ABC):
 
 
 class BasicAutoencoderAnomalyDetectionV1(ScoreAnomalyDetection):
-    """A Basic approach that uses an autoencoder to detect differences. The autoencoder should take 64x64 pixel RBG images."""
+    """A Basic approach that uses an autoencoder to detect differences. The autoencoder should take image_sizes pixel RBG images."""
 
     def __init__(
         self,
         pretrained_convolutional_network: ConvolutionalAutoencoderV1,
         device: str = "cpu",
         cutoff_value: float = 0.5,
+        image_sizes = (64,64)
     ):
 
         self.pretrained_convolutional_network = pretrained_convolutional_network.to(
@@ -61,6 +62,7 @@ class BasicAutoencoderAnomalyDetectionV1(ScoreAnomalyDetection):
         )
         self.device = device
         self.cutoff_value = cutoff_value
+        self.image_sizes = np.array(image_sizes)
 
         pass
 
@@ -83,7 +85,7 @@ class BasicAutoencoderAnomalyDetectionV1(ScoreAnomalyDetection):
             for view_idx, view in enumerate(timestep):
                 grid_images = []
 
-                grid_images = reshape_split(view, np.array([64, 64]))
+                grid_images = reshape_split(view, self.image_sizes)
 
                 grid_images = (
                     np.transpose(grid_images, (0, 3, 1, 2)).astype(np.float32) / 255
@@ -98,11 +100,11 @@ class BasicAutoencoderAnomalyDetectionV1(ScoreAnomalyDetection):
                 )
 
                 reconstructed_grid_images = np.transpose(
-                    (reconstructed_grid_images * 255).astype(np.int16), (0, 2, 3, 1)
+                    (reconstructed_grid_images * 255).astype(np.uint8), (0, 2, 3, 1)
                 )
 
                 reconstructed_view = reshape_merge(
-                    reconstructed_grid_images, np.array([64, 64])
+                    reconstructed_grid_images, self.image_sizes
                 )
 
                 if verbose >= 5 and view_idx == 0 and timestep_idx == 0:
@@ -121,10 +123,23 @@ class BasicAutoencoderAnomalyDetectionV1(ScoreAnomalyDetection):
         # Step b: Differences between timesteps
         # Step c: Warp
         # Step d: Combine Timesteps
+        reconstructed_photos = reconstructed_photos.astype(np.float32)/255
+        photos = photos.astype(np.float32)/255
         differences = abs(photos - reconstructed_photos)
+        #differences[np.amax(differences, -1) < 0.8] = 0
+        if verbose >=5:
+            show_photo_grid(warp_image_grid(reconstructed_photos, sample.homographies))
+            plt.imshow(reconstructed_photos[3,9])
+            plt.show()
+            plt.imshow(photos[3,9])
+            plt.show()
+            plt.imshow(np.sum(differences[3,9]**2, axis=-1), cmap="gray")
+            plt.show()
 
         if verbose >= 5:
             show_photo_grid(differences)
+
+            show_photo_grid(warp_image_grid(differences, sample.homographies))
 
 
         integrated = []
@@ -133,9 +148,12 @@ class BasicAutoencoderAnomalyDetectionV1(ScoreAnomalyDetection):
             print(f"Warping...")
         homographies_start_time = ti()
         
+
+
         flat_differences = np.reshape(differences, (-1, *differences.shape[2:]))**2
+        flat_differences = (flat_differences*255).astype(np.uint8)
         flat_homographies = np.reshape(sample.homographies, (-1, *sample.homographies.shape[2:]))
-        
+
         resulting_integrated = integrate_images(flat_differences, flat_homographies)
 
 
@@ -144,11 +162,12 @@ class BasicAutoencoderAnomalyDetectionV1(ScoreAnomalyDetection):
         if verbose >= 3:
             print(f"Warping finished. Took {ti() - homographies_start_time:.2f}s.")
 
-        score_image = np.mean(
-            np.square(resulting_integrated), axis=-1
+        score_image = np.amax(
+            resulting_integrated, axis=-1
         )  # average out color dimension
 
-        return score_image
+
+        return score_image.astype(np.float32)/255
 
     def infer(
         self,
@@ -261,8 +280,10 @@ class ScoreEnsembleAnomalyDetection:
             scores = scores * self.weights
 
             score = np.sum(scores, axis=0) / np.sum(self.weights) #maybe use some nonlinear thing. like maximum or softmax-ish.
+            
 
             score = (score * 255).astype(np.uint8)
+
 
             impossible_mask = make_impossible_mask(sample)
             score[impossible_mask] = 0
@@ -277,8 +298,7 @@ class ScoreEnsembleAnomalyDetection:
                 plt.title("The combined scores blurred")
                 plt.show()
 
-
-            thresh = ((score >= 255 * threshold) * 255).astype(np.uint8)
+            thresh = ((score >= threshold) * 255).astype(np.uint8)
 
             contours = cv2.findContours(
                 thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE

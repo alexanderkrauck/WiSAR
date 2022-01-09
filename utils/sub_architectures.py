@@ -54,7 +54,7 @@ class ConvolutionalAutoencoderV1(nn.Module, AbstractTorchArchitecture):
         self.enc_conv3 = nn.Conv2d(64, 128, 4)
         self.enc_pool3 = nn.MaxPool2d((2, 2), return_indices=True)
 
-        self.mid_conv = nn.ConvTranspose2d(128, 128, 1)
+        self.mid_conv = nn.Conv2d(128, 128, 1)
 
         self.dec_pool1 = nn.MaxUnpool2d((2, 2))
         self.dec_conv1 = nn.ConvTranspose2d(128, 64, 4)
@@ -102,6 +102,78 @@ class ConvolutionalAutoencoderV1(nn.Module, AbstractTorchArchitecture):
 
         if path is None:
             path = os.path.join("saved_models", "ConvolutionalAutoencoderV1")
+        Path(path).mkdir(parents=True, exist_ok=True)
+
+        if filename is None:
+            filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S.pt")
+
+        save_name = os.path.join(path, filename)
+        torch.save(self.state_dict(), save_name)
+
+        print(f"Paramters saved to file '{save_name}'.")
+
+class ConvolutionalAutoencoderV2(nn.Module, AbstractTorchArchitecture):
+    """A Convolutional Autoencoder that expects 64x64 inputs"""
+
+    def __init__(self, p_dropout: float = 0.2):
+        """
+        
+        Parameters
+        ----------
+        p_dropout : float
+            The dropout probability in each of the dropouts.
+        """
+        super().__init__()
+        self.p_dropout = p_dropout
+
+        self.enc_conv1 = nn.Conv2d(3, 64, 3, padding=1, stride=2)
+        self.enc_conv2 = nn.Conv2d(64, 128, 3, padding=1, stride=2)
+        self.enc_conv3 = nn.Conv2d(128, 256, 3, padding=1, stride=2)
+
+        self.dec_conv1 = nn.ConvTranspose2d(256, 128, 2, stride=2)
+        self.dec_conv2 = nn.ConvTranspose2d(128, 64, 2, stride=2)
+        self.dec_conv3 = nn.ConvTranspose2d(64, 3, 2, stride=2)
+
+        self.dropout = nn.Dropout2d(p=p_dropout)
+
+
+    def forward(self, x, return_coding:bool = False):
+
+        x = torch.relu(self.enc_conv1(x))
+        x = self.dropout(x)
+        x = torch.relu(self.enc_conv2(x))
+        x = self.dropout(x)
+        #x = torch.relu(self.enc_conv3(x))
+        #x = self.dropout(x)
+
+        if return_coding:
+            coding = torch.clone(x)
+
+        #x = torch.relu(self.dec_conv1(x))
+        #x = self.dropout(x)
+        x = torch.relu(self.dec_conv2(x))
+        x = self.dropout(x)
+        x = self.dec_conv3(x)
+
+        x = torch.sigmoid(x)
+
+        if return_coding:
+            return x, coding
+        return x
+
+    def save(self, path: Optional[str] = None, filename: Optional[str] = None):
+        """This Function saves the parameters of the model.
+        
+        Parameters
+        ----------
+        path: Optional[str]
+            The path where the parameter file should be stored. If None then the path "saved_models/ConvolutionalAutoencoderV1" is used.
+        filename: Optional[str]
+            The filename of the parameter file. If None the timestamp is used.
+        """
+
+        if path is None:
+            path = os.path.join("saved_models", "ConvolutionalAutoencoderV2")
         Path(path).mkdir(parents=True, exist_ok=True)
 
         if filename is None:
