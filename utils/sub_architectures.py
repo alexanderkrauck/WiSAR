@@ -65,7 +65,7 @@ class ConvolutionalAutoencoderV1(nn.Module, AbstractTorchArchitecture):
 
         self.dropout = nn.Dropout2d(p=p_dropout)
 
-    def forward(self, x):
+    def forward(self, x, return_coding:bool = False):
         x, indices1 = self.enc_pool1(self.enc_conv1(x))
         x = self.dropout(torch.relu(x))
         x, indices2 = self.enc_pool2(self.enc_conv2(x))
@@ -74,6 +74,8 @@ class ConvolutionalAutoencoderV1(nn.Module, AbstractTorchArchitecture):
         x = self.dropout(torch.relu(x))
 
         x = self.mid_conv(x)
+        if return_coding:
+            coding = torch.clone(x)
 
         x = self.dec_conv1(self.dec_pool1(x, indices3))
         x = self.dropout(torch.relu(x))
@@ -82,6 +84,9 @@ class ConvolutionalAutoencoderV1(nn.Module, AbstractTorchArchitecture):
         x = self.dec_conv3(self.dec_pool3(x, indices1))
 
         x = torch.sigmoid(x)
+
+        if return_coding:
+            return x, coding
         return x
 
     def save(self, path: Optional[str] = None, filename: Optional[str] = None):
