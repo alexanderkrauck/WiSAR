@@ -12,10 +12,11 @@ from .basic_function import *
 from .data import MultiViewTemporalSample, make_impossible_mask, MultiViewTemporalDataset
 from .sub_architectures import ConvolutionalAutoencoderV1
 
-from typing import List
+from typing import List, Tuple
 import torch
 import numpy as np
 import cv2
+import json
 from time import time as ti
 
 import matplotlib.pyplot as plt
@@ -54,12 +55,20 @@ class BasicAutoencoderAnomalyDetectionV1(ScoreAnomalyDetection):
         pretrained_convolutional_network: ConvolutionalAutoencoderV1,
         device: str = "cpu",
         cutoff_value: float = 0.5,
-        image_sizes = (64,64)
+        image_sizes: Tuple = (64,64),
+        use_dropout: bool = False
     ):
 
         self.pretrained_convolutional_network = pretrained_convolutional_network.to(
             device
-        ).eval()
+        )
+
+        if use_dropout:
+            self.pretrained_convolutional_network.train()
+        else:
+            self.pretrained_convolutional_network.eval()
+
+
         self.device = device
         self.cutoff_value = cutoff_value
         self.image_sizes = np.array(image_sizes)
@@ -164,7 +173,7 @@ class BasicAutoencoderAnomalyDetectionV1(ScoreAnomalyDetection):
 
         score_image = np.amax(
             resulting_integrated, axis=-1
-        )  # average out color dimension
+        )  # max out color dimension
 
 
         return score_image.astype(np.float32)/255
@@ -265,10 +274,7 @@ class ScoreEnsembleAnomalyDetection:
         self.min_box_size = min_box_size
         self.min_contour_area = min_contour_area
 
-    def infer(self, samples: Union[List[MultiViewTemporalSample], MultiViewTemporalDataset], threshold = 0.5, verbose = 0):
-
-        if isinstance(samples, MultiViewTemporalDataset):
-            samples = [samples[idx] for idx in range(len(samples))] 
+    def infer(self, samples: Union[List[MultiViewTemporalSample], MultiViewTemporalDataset], threshold = 0.5, verbose = 0, write_boxes_to_file: Optional[str] = None):
 
         res_boxes = []
         for sample in samples:
@@ -334,8 +340,15 @@ class ScoreEnsembleAnomalyDetection:
             res_boxes.append(np.array(boxes))
 
 
+        if write_boxes_to_file is not None:
 
-        
+            box_list = [el.tolist() for el in res_boxes]
+            box_dict = {}
+            for sample, boxes in zip(samples, box_list):
+                sample_name = os.path.split(sample.sample_path)[-1]
+                box_dict[sample_name] = boxes
+            with open(write_boxes_to_file, "w") as fi:
+                json.dump(box_dict, fi)
 
         return res_boxes
 
