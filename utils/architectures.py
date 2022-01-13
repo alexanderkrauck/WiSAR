@@ -253,7 +253,7 @@ class BasicTimestepAnomalyDetection(ScoreAnomalyDetection):
         pass
 
 class IntegratedImagesAnomalyDetection(ScoreAnomalyDetection):
-    TODO: finish!
+    #TODO: finish!
     def __init__(self, autoencoder):
 
         self.autoencoder = autoencoder
