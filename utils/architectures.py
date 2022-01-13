@@ -151,13 +151,11 @@ class BasicAutoencoderAnomalyDetectionV1(ScoreAnomalyDetection):
             show_photo_grid(warp_image_grid(differences, sample.homographies))
 
 
-        integrated = []
-
         if verbose >= 3:
             print(f"Warping...")
         homographies_start_time = ti()
         
-
+        #timesteps x perspectives x height x width x color -> timesteps * perspectives x height x width x color
 
         flat_differences = np.reshape(differences, (-1, *differences.shape[2:]))**2
         flat_differences = (flat_differences*255).astype(np.uint8)
@@ -173,7 +171,7 @@ class BasicAutoencoderAnomalyDetectionV1(ScoreAnomalyDetection):
 
         score_image = np.amax(
             resulting_integrated, axis=-1
-        )  # max out color dimension
+        )  # max out color dimension #TODO: play around with
 
 
         return score_image.astype(np.float32)/255
@@ -253,6 +251,31 @@ class BasicTimestepAnomalyDetection(ScoreAnomalyDetection):
         photos = sample.photos
 
         pass
+
+class IntegratedImagesAnomalyDetection(ScoreAnomalyDetection):
+    TODO: finish!
+    def __init__(self, autoencoder):
+
+        self.autoencoder = autoencoder
+        pass
+
+    def score(self, sample: MultiViewTemporalSample,  verbose: int = 0) -> np.ndarray:
+        """
+        
+        Returns
+        -------
+        score: np.nparray
+            The score is of shape 1024x1024 and contains for each pixel of the integrated image a score between 0 to 1. 1 stands for stong anomaly.
+        """
+
+        
+        for timestep_idx in range(7):
+            integrated_timestep_img = sample.integrate(timestep_idx)
+            self.autoencoder(integrated_timestep_img)
+
+        
+        return score
+        
 
 
 class ScoreEnsembleAnomalyDetection:
