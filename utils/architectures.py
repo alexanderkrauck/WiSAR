@@ -277,6 +277,44 @@ class IntegratedImagesAnomalyDetection(ScoreAnomalyDetection):
         return score
         
 
+class MeanTimestepDifferenceAnomalyDetection(ScoreAnomalyDetection):
+
+
+
+    def score(self, sample: MultiViewTemporalSample,  verbose: int = 0) -> np.ndarray:
+        """
+        
+        Returns
+        -------
+        score: np.nparray
+            The score is of shape 1024x1024 and contains for each pixel of the integrated image a score between 0 to 1. 1 stands for stong anomaly.
+        """
+
+        
+        timesteps = []
+        for timestep_idx in range(7):
+            mid_img = sample.integrate(timestep_idx)
+            timesteps.append(mid_img)
+
+        timesteps = np.array(timesteps, dtype=np.float64)
+        mean_timestep = np.mean(timesteps,axis=0)
+
+        diffs = []
+        for timestep in timesteps:
+            diff = np.amax(abs(timestep - mean_timestep), -1).astype(np.uint8)
+            diff[diff < 15] = 0
+            diffs.append(diff)
+
+        diffs = np.array(diffs, dtype=np.float64)
+        mean_diff = np.mean(diffs, axis = 0).astype(np.uint8)
+        mean_diff = cv2.GaussianBlur(mean_diff, (9, 9), 50)
+        mean_diff[mean_diff < 10] = 0
+        mean_diff[mean_diff != 0] = 255
+
+        mean_diff = mean_diff.astype(np.float32)/255
+        
+        return mean_diff
+
 
 class ScoreEnsembleAnomalyDetection:
     def __init__(
