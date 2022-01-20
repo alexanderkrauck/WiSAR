@@ -1,4 +1,3 @@
-#%matplotlib inline
 import importlib
 from IPython.display import clear_output
 import json
@@ -263,7 +262,7 @@ model=sub_architectures.ConvolutionalAutoencoderV2, optim=torch.optim.Adam, lr=1
 def HyperparameterSearch():
     
     param_grid = {'model_types': [sub_architectures.ConvolutionalAutoencoderV2],
-                  'optimizers': [torch.optim.Adam, torch.optim.RAdam, torch.optim.Adagrad],
+                  'optimizers': [torch.optim.Adam, torch.optim.Adagrad],#torch.optim.RAdam, 
                   'learning_rates': [1e-2, 5e-3, 1e-3],
                   'epoch_values': [10, 20, 30, 40, 50]
                   }
@@ -285,7 +284,7 @@ def HyperparameterSearch():
     for score in scores:
         print(score)
 
-HyperparameterSearch()
+
 
 #trained_model_sub = train(pretrained_sub_arch=None, show_results=True) 
 #pretrained_sub_arch=None if training a sub-architecture, otherwise exchange "None" placeholder with a pre-trained model
