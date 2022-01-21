@@ -63,6 +63,7 @@ class MultiViewTemporalSample:
         self.homographies = []
         self.mode = mode
         self.sample_path = sample_path
+
         for timestep in range(0, 7):
             timestep_photos = []
             timestep_homographies = []
@@ -88,6 +89,8 @@ class MultiViewTemporalSample:
                 json.load(open(os.path.join(sample_path, "labels.json")))
             )
 
+        self.impossible_mask = None
+
     def show_photo_grid(self):
         """Show a photo grid of all photos in the sample"""
 
@@ -103,8 +106,7 @@ class MultiViewTemporalSample:
         """
 
         integrated_image = integrate_images(
-            images=self.photos[timestep],
-            homographies=self.homographies[timestep]
+            images=self.photos[timestep], homographies=self.homographies[timestep]
         )
 
         return integrated_image
@@ -112,8 +114,13 @@ class MultiViewTemporalSample:
     def get_warped_grid(self):
 
         warped_grid = warp_image_grid(self.photos, self.homographies)
-        
+
         return warped_grid
+
+    def get_impossible_mask(self):
+        if self.impossible_mask is None:
+            self.impossible_mask = make_impossible_mask(self)
+        return self.impossible_mask
 
     def draw_labels(
         self, labels: Optional[np.ndarray] = None, on_integrated: bool = False
@@ -302,7 +309,6 @@ class GridCutoutDataset(MultiViewTemporalDataset):
 class RandomSamplingGridCutoutDataset(Dataset):
     """Lazy Loading Dataset Class that should be used for training the Autoencoder(-like) part"""
 
-
     def __init__(
         self,
         path: str = "data",
@@ -347,7 +353,6 @@ class RandomSamplingGridCutoutDataset(Dataset):
         self.n_images_in_ram = n_images_in_ram
         self.resample_image_every_n_draws = resample_image_every_n_draws
 
-
         self.image_paths = []
         for dir in os.listdir(path):
             sub_path = os.path.join(path, dir)
@@ -374,7 +379,6 @@ class RandomSamplingGridCutoutDataset(Dataset):
             self.cut_shape = np.array(crop_shape)
             img_height = self.ram_images.shape[1]
             self.rand_crop_range = np.array([img_height, 1024]) - np.array(crop_shape)
-
 
     def sample_image(self):
         image_path = random.sample(self.image_paths, 1)[0]
@@ -418,6 +422,110 @@ class RandomSamplingGridCutoutDataset(Dataset):
 
         return float_image
 
+
+class RandomSamplingFourDGridCutoutDataset(Dataset):
+    def __init__(
+        self,
+        path: str = "data",
+        mode: str = "train",
+        n_samples_in_RAM: int = 5,
+        n_epoch_samples: int = 1000,
+        resample_every_n_draws: int = 100,
+        crop_shape: Tuple = (64, 64),
+        preprocess_image_options: Dict = {
+            "use_mask": True,
+            "equalize_hist": True,
+            "crop_black": True,
+        },
+        horizontal_add = 8,
+        vertial_add = 15
+    ):
+
+        assert mode in ["train", "test", "validation"]
+
+        self.preprocess_image_options = preprocess_image_options
+        self.mode = mode
+
+        path = os.path.join(path, mode)
+
+        self.n_epoch_samples = n_epoch_samples
+        self.n_samples_in_RAM = n_samples_in_RAM
+        self.resample_every_n_draws = resample_every_n_draws
+        self.horizontal_add = horizontal_add
+        self.vertial_add = vertial_add
+
+        self.sample_paths = [
+            os.path.join(path, sample_dir)
+            for sample_dir in os.listdir(path)
+            if os.path.isdir(os.path.join(path, sample_dir))
+        ]
+
+        self.ram_samples = []
+        for n in range(n_samples_in_RAM):
+
+            sample = self.sample()
+            self.ram_samples.append(sample)
+
+        self.count_before_resample = 0
+
+
+        self.cut_shape = np.array(crop_shape)
+
+    def sample(self):
+        sample_path = random.sample(self.sample_paths, 1)[0]
+        sample = MultiViewTemporalSample(
+            sample_path, self.mode, self.preprocess_image_options
+        )
+
+        warped_grid = sample.get_warped_grid()
+        impossible_mask = sample.get_impossible_mask()
+
+
+        left_intend = np.argmin(np.amin(impossible_mask, axis=0)) + self.horizontal_add
+        right_intend = 1024 - (np.argmin(np.flip(np.amin(impossible_mask, axis=0))) + self.horizontal_add)
+        top_intend = np.argmin(np.amin(impossible_mask, axis=1)) + self.vertial_add
+        bottom_intend = 1024 - (np.argmin(np.flip(np.amin(impossible_mask, axis=1))) + self.vertial_add)
+
+        warped_grid = warped_grid[:,:,top_intend:bottom_intend, left_intend:right_intend]
+
+        del sample #reduce RAM
+        return warped_grid
+
+    def resample(self):
+
+        new_sample = self.sample()
+        replace_idx = random.randint(0, self.n_samples_in_RAM - 1)
+
+        self.ram_samples[replace_idx] = new_sample
+
+    def __len__(self):
+        return self.n_epoch_samples
+
+    def __getitem__(self, index):
+
+        sample_index = index % self.n_samples_in_RAM  # maybe change?
+        sample = self.ram_samples[sample_index]
+        
+
+        vertical_margin = random.randint(0, sample.shape[2] - self.cut_shape[0])
+        horizontal_margin = random.randint(0, sample.shape[3] - self.cut_shape[1])
+
+        sample = sample[:,:,
+            vertical_margin : vertical_margin + self.cut_shape[0],
+            horizontal_margin : horizontal_margin + self.cut_shape[1],
+        ]
+
+        float_image = np.transpose(sample, (4, 0, 1, 2, 3)).astype(np.float32) / 255
+
+        self.count_before_resample = (
+            self.count_before_resample + 1
+        ) % self.resample_every_n_draws
+        if self.count_before_resample == 0:
+            self.resample()
+
+        return float_image
+
+
 def make_impossible_mask(sample: MultiViewTemporalSample) -> np.ndarray:
     """Creates the mask for a MultiViewTemporalSample, where there can not be any boxes.
 
@@ -437,7 +545,7 @@ def make_impossible_mask(sample: MultiViewTemporalSample) -> np.ndarray:
     for timestep_homography in sample.homographies:
         perspectives = []
         for homography in timestep_homography:
-            photo = (~mask__).astype(np.uint8)*255
+            photo = (~mask__).astype(np.uint8) * 255
 
             warped_photo = cv2.warpPerspective(photo, homography, photo.shape[:2])
 
@@ -445,6 +553,6 @@ def make_impossible_mask(sample: MultiViewTemporalSample) -> np.ndarray:
         bnw.append(np.array(perspectives))
     bnw = np.array(bnw)
 
-    impossible_mask = ~ np.amin(bnw, axis=(0,1)).astype(bool)
+    impossible_mask = ~np.amin(bnw, axis=(0, 1)).astype(bool)
 
     return impossible_mask

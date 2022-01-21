@@ -18,6 +18,9 @@ from abc import ABC, abstractmethod
 from typing import Union, List, Tuple, Callable, Dict, Iterable, Optional
 
 
+from .pytorch_convNd.convNd import convNd
+
+
 class AbstractTorchArchitecture(ABC):
     @abstractmethod
     def save(self, path: str, filename: str):
@@ -46,10 +49,10 @@ class ConvolutionalAutoencoderV1(nn.Module, AbstractTorchArchitecture):
         """
         super().__init__()
         self.p_dropout = p_dropout
-
-        self.enc_conv1 = nn.Conv2d(3, 16, 3)
-        self.enc_pool1 = nn.MaxPool2d((2, 2), return_indices=True)
-        self.enc_conv2 = nn.Conv2d(16, 64, 5)
+        #3x64x64
+        self.enc_conv1 = nn.Conv2d(3, 16, 3)#16x62x62
+        self.enc_pool1 = nn.MaxPool2d((2, 2), return_indices=True)#16x31x31
+        self.enc_conv2 = nn.Conv2d(16, 64, 5)#64x27x27
         self.enc_pool2 = nn.MaxPool2d((3, 3), return_indices=True)
         self.enc_conv3 = nn.Conv2d(64, 128, 4)
         self.enc_pool3 = nn.MaxPool2d((2, 2), return_indices=True)
@@ -167,7 +170,7 @@ class ConvolutionalAutoencoderV2(nn.Module, AbstractTorchArchitecture):
         Parameters
         ----------
         path: Optional[str]
-            The path where the parameter file should be stored. If None then the path "saved_models/ConvolutionalAutoencoderV1" is used.
+            The path where the parameter file should be stored. If None then the path "saved_models/ConvolutionalAutoencoderV2" is used.
         filename: Optional[str]
             The filename of the parameter file. If None the timestamp is used.
         """
@@ -184,3 +187,50 @@ class ConvolutionalAutoencoderV2(nn.Module, AbstractTorchArchitecture):
 
         print(f"Paramters saved to file '{save_name}'.")
 
+class FourDAutoencoderV1(nn.Module, AbstractTorchArchitecture):
+
+    def __init__(self):
+        super().__init__()
+
+        self.enc_1 = convNd(in_channels=3, out_channels=16, num_dims=4, kernel_size=(3,1,3,3), stride=(1,1,2,2), padding=(0,0,1,1))
+        self.enc_2 = convNd(in_channels=16, out_channels=64, num_dims=4, kernel_size=(3,1,3,3), stride=(1,1,2,2), padding=(0,0,1,1))
+
+
+        self.dec_1 = convNd(in_channels=64, out_channels=16, num_dims=4, kernel_size=(3,1,2,2), stride=(1,1,2,2), padding=0, is_transposed=True)
+        self.dec_2 = convNd(in_channels=16, out_channels=3, num_dims=4, kernel_size=(3,1,2,2), stride=(1,1,2,2), padding=0, is_transposed=True)
+
+
+
+    def forward(self,x):
+        
+        x = torch.relu(self.enc_1(x))
+        x = torch.relu(self.enc_2(x))
+
+
+        x = torch.relu(self.dec_1(x))
+        x = torch.sigmoid(self.dec_2(x))
+
+        return x
+
+    def save(self, path: Optional[str] = None, filename: Optional[str] = None):
+        """This Function saves the parameters of the model.
+        
+        Parameters
+        ----------
+        path: Optional[str]
+            The path where the parameter file should be stored. If None then the path "saved_models/FourDAutoencoderV1" is used.
+        filename: Optional[str]
+            The filename of the parameter file. If None the timestamp is used.
+        """
+
+        if path is None:
+            path = os.path.join("saved_models", "FourDAutoencoderV1")
+        Path(path).mkdir(parents=True, exist_ok=True)
+
+        if filename is None:
+            filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S.pt")
+
+        save_name = os.path.join(path, filename)
+        torch.save(self.state_dict(), save_name)
+
+        print(f"Paramters saved to file '{save_name}'.")
