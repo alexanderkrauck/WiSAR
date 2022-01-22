@@ -3,6 +3,7 @@ Author: Cai Yitao
 Date: 2022/1/22
 """
 
+from platform import architecture
 import torch.nn.functional as F
 import os
 import json
@@ -12,6 +13,7 @@ from utils.data import MultiViewTemporalSample, make_impossible_mask
 import utils.data as data
 import utils.sub_architectures as sub_architectures
 import utils.architectures as architectures
+from utils.architectures import ScoreAnomalyDetection
 from utils.basic_function import draw_labels
 import importlib
 import torch
@@ -29,7 +31,7 @@ import ot
 
 
 
-class IntegrateReconstructedImages(object):
+class IntegrateReconstructedImages(ScoreAnomalyDetection):
     """modified from MultiviewTemporalSample"""
     def __init__(self,path):
         self.path = path
@@ -62,7 +64,7 @@ class IntegrateReconstructedImages(object):
 
 
 
-class WassersteinAnomalyScore(object):
+class WassersteinAnomalyScore(ScoreAnomalyDetection):
     def __init__(self,path,sample:data.MultiViewTemporalSample,
     integrateimages:IntegrateReconstructedImages,
     square_distance = True):
@@ -146,7 +148,7 @@ def reconstruct_image(image, autoencoder):
     return reconstructed_photos
 
 
-class MSEAnomalyDetection(object):
+class MSEAnomalyDetection(ScoreAnomalyDetection):
     def __init__(self,score,threshold = 0.5):
         self.threshold = threshold
         self.score = score
