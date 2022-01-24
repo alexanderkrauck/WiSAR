@@ -65,22 +65,22 @@ class IntegrateReconstructedImages(ScoreAnomalyDetection):
 
 
 class WassersteinAnomalyScore(ScoreAnomalyDetection):
-    def __init__(self,path,sample:data.MultiViewTemporalSample,
+    def __init__(self,path,reconstructed_photos,
     integrateimages:IntegrateReconstructedImages,
     square_distance = True):
         self.path = path
         self.integrateimages = integrateimages
-
-        self.sample = sample
+        self.reconstructed_photos = reconstructed_photos
+        # self.sample = sample
         self.square_distance = square_distance
 
 
-    def get_score(self,reconstructed_photos):
+    def score(self, sample:data.MultiViewTemporalSample):
     
         scores = []
         for t in range(7):
             int_img = self.sample.integrate(t)
-            int_recon_img = self.integrateimages.integrate(reconstructed_photos, t)
+            int_recon_img = self.integrateimages.integrate(self.reconstructed_photos, t)
             if self.square_distance:
                 distance = np.square(abs(int_img - int_recon_img))
                 score = cv2.GaussianBlur(np.amax(distance,axis=-1),(9,9),6)
@@ -166,7 +166,7 @@ class MSEAnomalyDetection(ScoreAnomalyDetection):
             boxes.append(box.tolist())
         return boxes
 
-def collect_labels(dataset,path,autoencoder,w_bbs_f):
+def predict_labels(dataset,path,autoencoder,w_bbs_f=None):
     # dirs = [dir for dir in os.listdir(path) if os.path.isdir(os.path.join(path, dir))]
     # dirs.sort()
     labels = {}
